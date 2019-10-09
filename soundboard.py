@@ -100,21 +100,27 @@ def read_many(paths, resolve, keys=KEYS):
 def download(video):
     if os.path.exists(video['path']):
         return
-    cmd = ['quvi', '--verbosity', 'mute', '--feature', '-verify', video['uri'],
-            '--exec', 'wget --progress=dot %%u -O %s' % video['path']]
-    if video['format']:
-        cmd.extend(['--format', video['format']])
-    ret = subprocess.call(cmd)
-    if ret == 0x41:  # QUVI_NOSUPPORT, libquvi does not support the host
-        # Maybe we can just download the bare resource.
-        subprocess.call(['wget', video['uri'], '-O', video['path']])
+    cmd = ['youtube-dl', '-f', 'worstvideo', '-o', video['path'].replace('%', '%%'), '--', video['loc']]
+    print ' '.join(cmd)
+    # if video['format']:
+    #     cmd.extend(['--format', video['format']])
+    try:
+        ret = subprocess.call(cmd)
+    except Exception as e:
+        print e, video['path']
+        return
 
 def setup(videos, nprocs=PROCESSES):
     try:
         os.makedirs(os.path.join(HERE, CACHE_DIR))
-    except OSError:
+    except OSError as e:
         pass
-
+    # youtube-dl is a requirement
+    try:
+        subprocess.check_output(["youtube-dl", "--version"])
+    except OSError as e:
+        print 'youtube-dl is not installed: https://youtube-dl.org/'
+        sys.exit(1)
     pool = multiprocessing.Pool(nprocs)
     pool.map(download, videos.values(), chunksize=1)
 
@@ -226,6 +232,13 @@ def main(argv):
 
     videos = read_many(args or [os.path.join(HERE, CONFIG_FILE)],
                        not options.no_resolve)
+
+    # mplayer is a requirement
+    try:
+        subprocess.check_output(["mplayer", "-v"])
+    except OSError as e:
+        print 'mplayer is not installed http://www.mplayerhq.hu'
+        sys.exit(1)
 
     if options.key:
         play(videos[options.key])
